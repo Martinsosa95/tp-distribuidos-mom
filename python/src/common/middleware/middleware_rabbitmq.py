@@ -1,6 +1,6 @@
-import pika
 import random
 import string
+import pika
 from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError, MessageMiddlewareCloseError
 
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
@@ -19,23 +19,26 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
     def start_consuming(self, on_message_callback):
         def callback(ch, method, properties, body):
             try:
-                ack = lambda: ch.basic_ack(delivery_tag=method.delivery_tag)
-                nack = lambda: ch.basic_nack(delivery_tag=method.delivery_tag)
+                def ack():
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                def nack():
+                    ch.basic_nack(delivery_tag=method.delivery_tag)
                 on_message_callback(body, ack, nack)
             except Exception as e:
                 raise MessageMiddlewareMessageError(f"Error processing message from RabbitMQ: {e}")
-            
-            try:
-                self.channel.basic_consume(
-                    queue=self.queue_name,
-                    on_message_callback=callback
-                )
-            except Exception as e:
-                raise MessageMiddlewareDisconnectedError(f"Error consuming from RabbitMQ: {e}")
+
+        try:
+            self.channel.basic_consume(
+                queue=self.queue_name,
+                on_message_callback=callback
+            )
+            self.channel.start_consuming()
+        except Exception as e:
+            raise MessageMiddlewareDisconnectedError(f"Error consuming from RabbitMQ: {e}")
 
     def stop_consuming(self):
         try:
-            self.channel.stop_consumming()
+            self.channel.stop_consuming()
         except Exception as e:
             raise MessageMiddlewareDisconnectedError(f"Error stopping consuming from RabbitMQ: {e}")
 
@@ -43,8 +46,8 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
     def send(self, message):
         try:
             self.channel.basic_publish(
-                exchange='', 
-                routing_key=self.queue_name, 
+                exchange='',
+                routing_key=self.queue_name,
                 body=message
             )
         except Exception as e:
@@ -63,16 +66,3 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     def __init__(self, host, exchange_name, routing_keys):
         pass
 
-	def start_consuming(self, on_message_callback):
-		pass
-	
-
-	def stop_consuming(self):
-		pass
-	
-
-	def send(self, message):
-		pass
-
-	def close(self):
-		pass
